@@ -5,7 +5,7 @@ The **Mihira Stores** project repository. When operating within this codebase, y
 ---
 
 ## Technology Stack
-- **Backend**: ASP.NET Core Web API (.NET 8)
+- **Backend**: ASP.NET Core Web API (.NET 10)
 - **ORM**: Entity Framework Core
 - **Database**: SQL Server
 - **Frontend**: React with TypeScript and Vite
