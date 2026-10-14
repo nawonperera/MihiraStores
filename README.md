@@ -14,6 +14,47 @@
 
 ---
 
+## API Route Contract
+
+All endpoints follow RESTful conventions, returning and accepting immutable C# record DTOs. Database entities (`Branch`, `Product`, `Stock`, `StockTransfer`) are never exposed directly.
+
+### Endpoints
+
+| Method | Route | Description | Success Code | Error Codes |
+| :--- | :--- | :--- | :--- | :--- |
+| `GET` | `/api/branches` | Retrieves all registered store branches & warehouses | `200 OK` | — |
+| `GET` | `/api/products` | Retrieves all catalog products | `200 OK` | — |
+| `GET` | `/api/branches/{id}/stock` | Retrieves current inventory levels for a branch | `200 OK` | `404 Not Found` |
+| `POST` | `/api/transfers` | Creates a new stock transfer in `Requested` status | `201 Created` | `400 Bad Request`, `404 Not Found` |
+| `GET` | `/api/transfers` | Lists transfers with optional `?branchId=&status=` filters | `200 OK` | — |
+| `GET` | `/api/transfers/{id}` | Retrieves a specific transfer by its ID | `200 OK` | `404 Not Found` |
+| `POST` | `/api/transfers/{id}/dispatch` | Validates stock, deducts source inventory, and sets status to `Dispatched` | `200 OK` | `400 Bad Request`, `404 Not Found`, `409 Conflict` |
+| `POST` | `/api/transfers/{id}/receive` | Increments destination stock and sets status to `Received` | `200 OK` | `400 Bad Request`, `404 Not Found`, `409 Conflict` |
+| `POST` | `/api/transfers/{id}/cancel` | Cancels a `Requested` transfer without modifying stock | `200 OK` | `400 Bad Request`, `404 Not Found`, `409 Conflict` |
+
+### Response Codes & Meanings
+- **`200 OK`**: Successful query or idempotent action re-execution.
+- **`201 Created`**: Successfully created transfer, includes `Location` header to `/api/transfers/{id}`.
+- **`400 Bad Request`**: Invalid request payload (e.g. quantity `<= 0`, empty items, identical source and destination, or insufficient source stock).
+- **`404 Not Found`**: Referenced branch, product, or transfer ID does not exist.
+- **`409 Conflict`**: Operation cannot proceed due to invalid transfer status (e.g. attempting to receive a `Requested` transfer, or cancelling a `Dispatched` transfer) or optimistic concurrency collision.
+
+### Uniform Error Format (`ProblemDetails`)
+
+All error responses strictly return standard RFC 7807 `ProblemDetails` objects. Internal database exceptions, stack traces, and EF Core models are never exposed.
+
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+  "title": "Transfer State Conflict",
+  "status": 409,
+  "detail": "Transfer 3 cannot be cancelled because it is in 'Dispatched' status. Transfers can only be cancelled while in 'Requested' status.",
+  "instance": "/api/transfers/3/cancel"
+}
+```
+
+---
+
 ## Database Configuration
 
 The application uses **Microsoft SQL Server** as its configured database provider.
@@ -129,4 +170,5 @@ dotnet test tests/MihiraStores.Api.Tests
 ```bash
 dotnet run --project src/MihiraStores.Api
 ```
-Open OpenAPI / Swagger in browser at `https://localhost:<port>/openapi/v1.json`.
+Open Swagger UI in your browser at `http://localhost:5079/swagger` (or `https://localhost:7218/swagger`).
+OpenAPI v1 JSON specification is available at `http://localhost:5079/openapi/v1.json` and `http://localhost:5079/swagger/v1/swagger.json`.

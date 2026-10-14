@@ -19,8 +19,8 @@ public class TransfersController : ControllerBase
 
     [HttpPost]
     [ProducesResponseType<StockTransferDto>(StatusCodes.Status201Created)]
-    [ProducesResponseType<ErrorResponseDto>(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType<ErrorResponseDto>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<StockTransferDto>> CreateTransfer([FromBody] CreateStockTransferRequest request, CancellationToken cancellationToken)
     {
         try
@@ -30,23 +30,38 @@ public class TransfersController : ControllerBase
         }
         catch (EntityNotFoundException ex)
         {
-            return NotFound(new ErrorResponseDto(ex.Message));
+            return Problem(
+                detail: ex.Message,
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Resource Not Found",
+                instance: HttpContext.Request.Path
+            );
         }
         catch (BusinessRuleException ex)
         {
-            return BadRequest(new ErrorResponseDto(ex.Message));
+            return Problem(
+                detail: ex.Message,
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Invalid Request Data",
+                instance: HttpContext.Request.Path
+            );
         }
     }
 
     [HttpGet("{id:int}")]
     [ProducesResponseType<StockTransferDto>(StatusCodes.Status200OK)]
-    [ProducesResponseType<ErrorResponseDto>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<StockTransferDto>> GetTransferById(int id, CancellationToken cancellationToken)
     {
         var transfer = await _service.GetTransferByIdAsync(id, cancellationToken);
         if (transfer == null)
         {
-            return NotFound(new ErrorResponseDto($"Stock transfer with ID {id} was not found."));
+            return Problem(
+                detail: $"Stock transfer with ID {id} was not found.",
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Transfer Not Found",
+                instance: HttpContext.Request.Path
+            );
         }
         return Ok(transfer);
     }
@@ -64,9 +79,9 @@ public class TransfersController : ControllerBase
 
     [HttpPost("{id:int}/dispatch")]
     [ProducesResponseType<StockTransferDto>(StatusCodes.Status200OK)]
-    [ProducesResponseType<ErrorResponseDto>(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType<ErrorResponseDto>(StatusCodes.Status404NotFound)]
-    [ProducesResponseType<ErrorResponseDto>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<StockTransferDto>> DispatchTransfer(int id, CancellationToken cancellationToken)
     {
         try
@@ -76,23 +91,47 @@ public class TransfersController : ControllerBase
         }
         catch (EntityNotFoundException ex)
         {
-            return NotFound(new ErrorResponseDto(ex.Message));
+            return Problem(
+                detail: ex.Message,
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Transfer Not Found",
+                instance: HttpContext.Request.Path
+            );
         }
-        catch (BusinessRuleException ex)
+        catch (InvalidTransferStateException ex)
         {
-            return BadRequest(new ErrorResponseDto(ex.Message));
+            return Problem(
+                detail: ex.Message,
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Transfer State Conflict",
+                instance: HttpContext.Request.Path
+            );
         }
         catch (ConcurrencyConflictException ex)
         {
-            return Conflict(new ErrorResponseDto(ex.Message));
+            return Problem(
+                detail: ex.Message,
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Concurrency Conflict",
+                instance: HttpContext.Request.Path
+            );
+        }
+        catch (BusinessRuleException ex)
+        {
+            return Problem(
+                detail: ex.Message,
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Dispatch Validation Failed",
+                instance: HttpContext.Request.Path
+            );
         }
     }
 
     [HttpPost("{id:int}/receive")]
     [ProducesResponseType<StockTransferDto>(StatusCodes.Status200OK)]
-    [ProducesResponseType<ErrorResponseDto>(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType<ErrorResponseDto>(StatusCodes.Status404NotFound)]
-    [ProducesResponseType<ErrorResponseDto>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<StockTransferDto>> ReceiveTransfer(int id, CancellationToken cancellationToken)
     {
         try
@@ -102,23 +141,47 @@ public class TransfersController : ControllerBase
         }
         catch (EntityNotFoundException ex)
         {
-            return NotFound(new ErrorResponseDto(ex.Message));
+            return Problem(
+                detail: ex.Message,
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Transfer Not Found",
+                instance: HttpContext.Request.Path
+            );
         }
-        catch (BusinessRuleException ex)
+        catch (InvalidTransferStateException ex)
         {
-            return BadRequest(new ErrorResponseDto(ex.Message));
+            return Problem(
+                detail: ex.Message,
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Transfer State Conflict",
+                instance: HttpContext.Request.Path
+            );
         }
         catch (ConcurrencyConflictException ex)
         {
-            return Conflict(new ErrorResponseDto(ex.Message));
+            return Problem(
+                detail: ex.Message,
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Concurrency Conflict",
+                instance: HttpContext.Request.Path
+            );
+        }
+        catch (BusinessRuleException ex)
+        {
+            return Problem(
+                detail: ex.Message,
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Receive Validation Failed",
+                instance: HttpContext.Request.Path
+            );
         }
     }
 
     [HttpPost("{id:int}/cancel")]
     [ProducesResponseType<StockTransferDto>(StatusCodes.Status200OK)]
-    [ProducesResponseType<ErrorResponseDto>(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType<ErrorResponseDto>(StatusCodes.Status404NotFound)]
-    [ProducesResponseType<ErrorResponseDto>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<StockTransferDto>> CancelTransfer(int id, CancellationToken cancellationToken)
     {
         try
@@ -128,15 +191,39 @@ public class TransfersController : ControllerBase
         }
         catch (EntityNotFoundException ex)
         {
-            return NotFound(new ErrorResponseDto(ex.Message));
+            return Problem(
+                detail: ex.Message,
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Transfer Not Found",
+                instance: HttpContext.Request.Path
+            );
         }
-        catch (BusinessRuleException ex)
+        catch (InvalidTransferStateException ex)
         {
-            return BadRequest(new ErrorResponseDto(ex.Message));
+            return Problem(
+                detail: ex.Message,
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Transfer State Conflict",
+                instance: HttpContext.Request.Path
+            );
         }
         catch (ConcurrencyConflictException ex)
         {
-            return Conflict(new ErrorResponseDto(ex.Message));
+            return Problem(
+                detail: ex.Message,
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Concurrency Conflict",
+                instance: HttpContext.Request.Path
+            );
+        }
+        catch (BusinessRuleException ex)
+        {
+            return Problem(
+                detail: ex.Message,
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Cancel Validation Failed",
+                instance: HttpContext.Request.Path
+            );
         }
     }
 }
