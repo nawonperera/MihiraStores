@@ -36,6 +36,7 @@ The **Mihira Stores** project repository. When operating within this codebase, y
    - Non-Negative Stock (`CurrentStock >= RequestedQuantity`).
    - Operation Idempotency (re-executing `/dispatch` or `/receive` returns current state without re-mutating stock).
    - Strict Transfer State Machine (`Requested` ➔ `Dispatched` ➔ `Received`; cancellation only legal from `Requested`).
+   - From and to branches must be different, and quantities must be more than zero.
 4. **EF Core & Database Conventions:**
    - Always `.AsNoTracking()` on read queries.
    - Eagerly load required relationships using `.Include()` and `.ThenInclude()` within the repository layer.
