@@ -151,5 +151,12 @@ All endpoints return and accept immutable C# record DTOs. Database entities (`Br
 | `POST` | `/api/transfers/{id}/receive` | Increments destination stock and sets status to `Received` | `200 OK`, `400 Bad Request`, `404 Not Found`, `409 Conflict` |
 | `POST` | `/api/transfers/{id}/cancel` | Cancels a `Requested` transfer without modifying stock | `200 OK`, `400 Bad Request`, `404 Not Found`, `409 Conflict` |
 
+---
 
+## 6. Assumptions
+
+- The app checks if data has changed right before saving (optimistic concurrency). If two people try to update the same thing at the exact same time, the second request is safely rejected so stock numbers never get messed up.
+- Items currently moving between branches are tracked simply by looking at transfers in Dispatched status, rather than creating a separate in transit stock column in the database.
+- Automated tests use a lightweight SQLite database so they run quickly. Because of this any features that rely specifically on SQL Server should also be tested directly on a real SQL Server database.
+- The React app checks user inputs and disables buttons while a request is loading to prevent double clicks, but the backend still does the real security and business rule checks.
 
