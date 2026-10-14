@@ -41,6 +41,7 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Stock>(s =>
         {
             s.HasKey(x => x.Id);
+            s.Property(x => x.LastUpdatedUtc).IsConcurrencyToken();
             s.HasIndex(x => new { x.BranchId, x.ProductId }).IsUnique();
 
             s.HasOne(x => x.Branch)
@@ -66,7 +67,8 @@ public class AppDbContext : DbContext
             st.Property(x => x.Status)
                 .HasConversion<string>()
                 .HasMaxLength(20)
-                .IsRequired();
+                .IsRequired()
+                .IsConcurrencyToken();
 
             st.HasOne(x => x.FromBranch)
                 .WithMany(b => b.OutgoingTransfers)
