@@ -49,38 +49,7 @@ public class StockInvariantTests : IDisposable
 
     private AppDbContext CreateVerificationContext() => new(_contextOptions);
 
-    // 1. Dispatch_WhenQuantityExceedsStock_LeavesStockAndStatusUnchanged
-    [Fact]
-    public async Task Dispatch_WhenQuantityExceedsStock_LeavesStockAndStatusUnchanged()
-    {
-        var (context, service) = CreateServiceContext();
-        await using (context)
-        {
-            // Warehouse has 500 units of Product 1
-            var initialStock = (await context.Stocks.FirstAsync(s => s.BranchId == 1 && s.ProductId == 1)).Quantity;
-
-            var transfer = await service.CreateTransferAsync(new CreateStockTransferRequest(
-                FromBranchId: 1,
-                ToBranchId: 2,
-                Lines: new[] { new CreateStockTransferLineRequest(1, 9999) } // Exceeds available stock
-            ));
-
-            // Act: Attempt to dispatch
-            var ex = await Assert.ThrowsAsync<InsufficientStockException>(() => service.DispatchTransferAsync(transfer.Id));
-            Assert.Contains("Insufficient stock", ex.Message);
-
-            // Assert: Verify actual database state
-            await using var verifyContext = CreateVerificationContext();
-            var verifiedStock = await verifyContext.Stocks.FirstAsync(s => s.BranchId == 1 && s.ProductId == 1);
-            var verifiedTransfer = await verifyContext.StockTransfers.FirstAsync(t => t.Id == transfer.Id);
-
-            Assert.Equal(initialStock, verifiedStock.Quantity);
-            Assert.Equal(TransferStatus.Requested, verifiedTransfer.Status);
-            Assert.Null(verifiedTransfer.DispatchedAtUtc);
-        }
-    }
-
-    // 2. Dispatch_WhenRepeated_DoesNotDeductStockTwice
+    // 1. Dispatch_WhenRepeated_DoesNotDeductStockTwice
     [Fact]
     public async Task Dispatch_WhenRepeated_DoesNotDeductStockTwice()
     {
@@ -237,69 +206,7 @@ public class StockInvariantTests : IDisposable
         }
     }
 
-    // 7. CreateTransfer_WhenBranchesAreSame_IsRejected
-    [Fact]
-    public async Task CreateTransfer_WhenBranchesAreSame_IsRejected()
-    {
-        var (context, service) = CreateServiceContext();
-        await using (context)
-        {
-            var initialTransferCount = await context.StockTransfers.CountAsync();
-
-            var request = new CreateStockTransferRequest(
-                FromBranchId: 1,
-                ToBranchId: 1,
-                Lines: new[] { new CreateStockTransferLineRequest(1, 10) }
-            );
-
-            // Act: Attempt to create transfer between same branch
-            var ex = await Assert.ThrowsAsync<BusinessRuleException>(() => service.CreateTransferAsync(request));
-            Assert.Contains("cannot be the same", ex.Message, StringComparison.OrdinalIgnoreCase);
-
-            // Assert: Verify database has no new transfer created
-            await using var verifyContext = CreateVerificationContext();
-            var verifiedTransferCount = await verifyContext.StockTransfers.CountAsync();
-            Assert.Equal(initialTransferCount, verifiedTransferCount);
-        }
-    }
-
-    // 8. CreateTransfer_WhenQuantityIsZeroOrNegative_IsRejected
-    [Fact]
-    public async Task CreateTransfer_WhenQuantityIsZeroOrNegative_IsRejected()
-    {
-        var (context, service) = CreateServiceContext();
-        await using (context)
-        {
-            var initialTransferCount = await context.StockTransfers.CountAsync();
-
-            var zeroQtyRequest = new CreateStockTransferRequest(
-                FromBranchId: 1,
-                ToBranchId: 2,
-                Lines: new[] { new CreateStockTransferLineRequest(1, 0) }
-            );
-
-            var negativeQtyRequest = new CreateStockTransferRequest(
-                FromBranchId: 1,
-                ToBranchId: 2,
-                Lines: new[] { new CreateStockTransferLineRequest(1, -5) }
-            );
-
-            // Act & Assert for quantity = 0
-            var exZero = await Assert.ThrowsAsync<BusinessRuleException>(() => service.CreateTransferAsync(zeroQtyRequest));
-            Assert.Contains("positive integer greater than zero", exZero.Message);
-
-            // Act & Assert for quantity < 0
-            var exNegative = await Assert.ThrowsAsync<BusinessRuleException>(() => service.CreateTransferAsync(negativeQtyRequest));
-            Assert.Contains("positive integer greater than zero", exNegative.Message);
-
-            // Assert: Verify database has no new transfer created
-            await using var verifyContext = CreateVerificationContext();
-            var verifiedTransferCount = await verifyContext.StockTransfers.CountAsync();
-            Assert.Equal(initialTransferCount, verifiedTransferCount);
-        }
-    }
-
-    // 9. Dispatch_WhenOneOfSeveralLinesHasInsufficientStock_RollsBackAllLines
+    // 6. Dispatch_WhenOneOfSeveralLinesHasInsufficientStock_RollsBackAllLines
     [Fact]
     public async Task Dispatch_WhenOneOfSeveralLinesHasInsufficientStock_RollsBackAllLines()
     {

@@ -1,67 +1,29 @@
 # Mihira Stores
 
-**Mihira Stores** is a multi-branch retail inventory and stock transfer management application designed with a strict 3-tier enterprise architecture.
+**Mihira Stores** is a multi branch retail inventory and stock transfer management system built on a strict 3 tier enterprise architecture (.NET 10 Web API, Entity Framework Core 10, SQL Server, and React 19 with TypeScript, Vite, and Tailwind CSS v4).
 
 ---
 
-## Technology Stack
+## 1. Prerequisites
 
-- **Backend**: ASP.NET Core Web API (.NET 10)
-- **ORM**: Entity Framework Core 10 (`Microsoft.EntityFrameworkCore.SqlServer`)
-- **Database**: Microsoft SQL Server (supports LocalDB, SQL Server Express, and full SQL Server instances)
-- **Frontend**: React 19 with TypeScript, Vite 8, and Tailwind CSS v4
-- **Testing**: xUnit with in-memory SQLite integration tests
+Before setting up or running the application, ensure the following tooling is installed:
 
----
-
-## API Route Contract
-
-All endpoints follow RESTful conventions, returning and accepting immutable C# record DTOs. Database entities (`Branch`, `Product`, `Stock`, `StockTransfer`) are never exposed directly.
-
-### Endpoints
-
-| Method | Route | Description | Success Code | Error Codes |
-| :--- | :--- | :--- | :--- | :--- |
-| `GET` | `/api/branches` | Retrieves all registered store branches & warehouses | `200 OK` | — |
-| `GET` | `/api/products` | Retrieves all catalog products | `200 OK` | — |
-| `GET` | `/api/branches/{id}/stock` | Retrieves current inventory levels for a branch | `200 OK` | `404 Not Found` |
-| `POST` | `/api/transfers` | Creates a new stock transfer in `Requested` status | `201 Created` | `400 Bad Request`, `404 Not Found` |
-| `GET` | `/api/transfers` | Lists transfers with optional `?branchId=&status=` filters | `200 OK` | — |
-| `GET` | `/api/transfers/{id}` | Retrieves a specific transfer by its ID | `200 OK` | `404 Not Found` |
-| `POST` | `/api/transfers/{id}/dispatch` | Validates stock, deducts source inventory, and sets status to `Dispatched` | `200 OK` | `400 Bad Request`, `404 Not Found`, `409 Conflict` |
-| `POST` | `/api/transfers/{id}/receive` | Increments destination stock and sets status to `Received` | `200 OK` | `400 Bad Request`, `404 Not Found`, `409 Conflict` |
-| `POST` | `/api/transfers/{id}/cancel` | Cancels a `Requested` transfer without modifying stock | `200 OK` | `400 Bad Request`, `404 Not Found`, `409 Conflict` |
-
-### Response Codes & Meanings
-- **`200 OK`**: Successful query or idempotent action re-execution.
-- **`201 Created`**: Successfully created transfer, includes `Location` header to `/api/transfers/{id}`.
-- **`400 Bad Request`**: Invalid request payload (e.g. quantity `<= 0`, empty items, identical source and destination, or insufficient source stock).
-- **`404 Not Found`**: Referenced branch, product, or transfer ID does not exist.
-- **`409 Conflict`**: Operation cannot proceed due to invalid transfer status (e.g. attempting to receive a `Requested` transfer, or cancelling a `Dispatched` transfer) or optimistic concurrency collision.
-
-### Uniform Error Format (`ProblemDetails`)
-
-All error responses strictly return standard RFC 7807 `ProblemDetails` objects. Internal database exceptions, stack traces, and EF Core models are never exposed.
-
-```json
-{
-  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.10",
-  "title": "Transfer State Conflict",
-  "status": 409,
-  "detail": "Transfer 3 cannot be cancelled because it is in 'Dispatched' status. Transfers can only be cancelled while in 'Requested' status.",
-  "instance": "/api/transfers/3/cancel"
-}
-```
+- **.NET SDK**: .NET 10.0 SDK (`dotnet --version` >= 10.0)
+- **Node.js**: Node.js v20.x or higher (`node -v`) and npm v10.x or higher (`npm -v`)
+- **Database Engine**: Microsoft SQL Server (one of the following):
+  - SQL Server 2022 Express / Developer Edition
+  - SQL Server LocalDB (`(localdb)\mssqllocaldb`, bundled with Visual Studio)
+  - Full SQL Server instance or Docker SQL Server container (`mcr.microsoft.com/mssql/server:2022-latest`)
+- **EF Core CLI Tools** (optional, for running migrations manually):
+  ```bash
+  dotnet tool install --global dotnet-ef
+  ```
 
 ---
 
-## Database Configuration
+## 2. Connection String Configuration
 
-The application uses **Microsoft SQL Server** as its configured database provider.
-
-### 1. Connection String Configuration
-
-The database connection string is located in [`src/MihiraStores.Api/appsettings.json`](src/MihiraStores.Api/appsettings.json) and can be overridden for local development in `appsettings.Development.json`:
+Database connection settings are located in [`src/MihiraStores.Api/appsettings.json`](src/MihiraStores.Api/appsettings.json) and can be customized per environment in `appsettings.Development.json`:
 
 ```json
 {
@@ -71,7 +33,7 @@ The database connection string is located in [`src/MihiraStores.Api/appsettings.
 }
 ```
 
-#### SQL Server Options
+### Connection String Options
 - **SQL Server LocalDB (Default)**:
   ```
   Server=(localdb)\\mssqllocaldb;Database=MihiraStoresDb;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True
@@ -80,63 +42,16 @@ The database connection string is located in [`src/MihiraStores.Api/appsettings.
   ```
   Server=.\\SQLEXPRESS;Database=MihiraStoresDb;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=true
   ```
-- **Standard SQL Server (with SQL Authentication)**:
+- **Standard / Docker SQL Server (SQL Authentication)**:
   ```
-  Server=localhost,1433;Database=MihiraStoresDb;User Id=sa;Password=YourPassword123!;TrustServerCertificate=True;MultipleActiveResultSets=true
+  Server=localhost,1433;Database=MihiraStoresDb;User Id=sa;Password=YourSecurePassword123!;TrustServerCertificate=True;MultipleActiveResultSets=true
   ```
 
 ---
 
-## Entity Framework Core Migrations
+## 3. Database Migration & Startup Seeding
 
-### Prerequisites
-
-Ensure the `dotnet-ef` global CLI tool is installed:
-
-```bash
-dotnet tool install --global dotnet-ef
-# or update existing tool:
-dotnet tool update --global dotnet-ef
-```
-
-### Applying Migrations
-
-To apply pending migrations to the configured database, run:
-
-```bash
-dotnet ef database update --project src/MihiraStores.Api
-```
-
-### Adding New Migrations
-
-When modifying domain entity models in `src/MihiraStores.Api/Models/` or configuration in `AppDbContext`:
-
-```bash
-dotnet ef migrations add <DescriptiveMigrationName> --project src/MihiraStores.Api
-```
-
-Inspect the generated migration under `src/MihiraStores.Api/Migrations/` before applying it.
-
-### Rolling Back Migrations
-
-To roll back to a specific previous migration or revert all migrations:
-
-```bash
-# Revert to a specific migration
-dotnet ef database update <PreviousMigrationName> --project src/MihiraStores.Api
-
-# Revert all migrations
-dotnet ef database update 0 --project src/MihiraStores.Api
-
-# Remove the latest unapplied migration
-dotnet ef migrations remove --project src/MihiraStores.Api
-```
-
----
-
-## Startup Seeding & Idempotency
-
-When the API starts up, it automatically executes pending migrations and runs the idempotent seeder:
+The application automatically applies all pending EF Core migrations and executes an idempotent seed at startup:
 
 ```csharp
 using (var scope = app.Services.CreateScope())
@@ -147,28 +62,94 @@ using (var scope = app.Services.CreateScope())
 }
 ```
 
-- **4 Locations**: Central Warehouse (`WH`), Colombo Branch (`CMB`), Kandy Branch (`KDY`), Galle Branch (`GLE`).
-- **5 Products**: Coconut Milk 400ml, Ceylon Black Tea 500g, Basmati Rice 5kg, Red Split Lentils 1kg, White Sugar 1kg.
-- **20 Stock Records**: Initialized with tier-appropriate positive quantities across all branches.
-- **Idempotency Guarantee**: The seeder queries existing records by unique code/SKU/composite keys; restarting the application will never produce duplicate records or corrupt data.
+### Manual Database Migration Commands
+If you prefer applying or managing migrations via CLI:
+
+```bash
+# Apply migrations to the configured database
+dotnet ef database update --project src/MihiraStores.Api
+
+# Add a new migration (after modifying entity models or AppDbContext)
+dotnet ef migrations add <DescriptiveMigrationName> --project src/MihiraStores.Api
+
+# Rollback to a specific migration
+dotnet ef database update <PreviousMigrationName> --project src/MihiraStores.Api
+
+# Remove the latest unapplied migration
+dotnet ef migrations remove --project src/MihiraStores.Api
+```
+
+### Seeded Baseline Data
+- **4 Locations**:
+  - `Central Warehouse` (`WH`, IsWarehouse = true) - initial stock: **500 units** per product
+  - `Colombo Branch` (`CMB`, IsWarehouse = false) - initial stock: **100 units** per product
+  - `Kandy Branch` (`KDY`, IsWarehouse = false) - initial stock: **75 units** per product
+  - `Galle Branch` (`GLE`, IsWarehouse = false) - initial stock: **50 units** per product
+- **5 Catalog Products**:
+  - Coconut Milk 400ml (`PROD-COCO-400`)
+  - Ceylon Black Tea 500g (`PROD-TEA-500`)
+  - Basmati Rice 5kg (`PROD-RICE-5KG`)
+  - Red Split Lentils 1kg (`PROD-LENT-1KG`)
+  - White Sugar 1kg (`PROD-SUGR-1KG`)
+- **20 Stock Records**: Pre-seeded across all 4 branches.
+- **Idempotency Guarantee**: Seeding checks for existing branch codes, SKUs, and `(BranchId, ProductId)` keys; subsequent app restarts will never duplicate records or corrupt stock levels.
 
 ---
 
-## Building and Running Tests
+## 4. How to Run the Application
 
-### Build Solution
-```bash
-dotnet build
-```
-
-### Run Tests
-```bash
-dotnet test tests/MihiraStores.Api.Tests
-```
-
-### Run Web API
+### Running the Backend Web API
+From the repository root:
 ```bash
 dotnet run --project src/MihiraStores.Api
 ```
-Open Swagger UI in your browser at `http://localhost:5079/swagger` (or `https://localhost:7218/swagger`).
-OpenAPI v1 JSON specification is available at `http://localhost:5079/openapi/v1.json` and `http://localhost:5079/swagger/v1/swagger.json`.
+- **HTTP Endpoint**: `http://localhost:5079`
+- **Swagger UI**: `http://localhost:5079/swagger`
+
+### Running the Frontend (React + Vite)
+In a separate terminal:
+```bash
+# Navigate to the frontend project
+cd src/MihiraStores.Web
+
+# Install npm dependencies
+npm install
+
+# Start the Vite development server
+npm run dev
+```
+- The frontend will be accessible at `http://localhost:5173`.
+
+---
+
+## 5. Running Automated Tests
+
+
+```bash
+# Run all tests
+dotnet test tests/MihiraStores.Api.Tests
+
+# Run tests with detailed test names
+dotnet test tests/MihiraStores.Api.Tests --logger "console;verbosity=normal"
+```
+
+---
+
+## 6. API Endpoint Summary
+
+All endpoints return and accept immutable C# record DTOs. Database entities (`Branch`, `Product`, `Stock`, `StockTransfer`) are never exposed directly.
+
+| Method | Route | Description | Status Codes |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/branches` | Retrieves all registered store branches & warehouses | `200 OK` |
+| `GET` | `/api/products` | Retrieves all catalog products | `200 OK` |
+| `GET` | `/api/branches/{id}/stock` | Retrieves current inventory levels for a branch | `200 OK`, `404 Not Found` |
+| `POST` | `/api/transfers` | Creates a new stock transfer in `Requested` status | `201 Created`, `400 Bad Request`, `404 Not Found` |
+| `GET` | `/api/transfers` | Lists transfers with optional `?branchId=&status=` filters | `200 OK` |
+| `GET` | `/api/transfers/{id}` | Retrieves a specific transfer by its ID | `200 OK`, `404 Not Found` |
+| `POST` | `/api/transfers/{id}/dispatch` | Validates stock, deducts source inventory, and sets status to `Dispatched` | `200 OK`, `400 Bad Request`, `404 Not Found`, `409 Conflict` |
+| `POST` | `/api/transfers/{id}/receive` | Increments destination stock and sets status to `Received` | `200 OK`, `400 Bad Request`, `404 Not Found`, `409 Conflict` |
+| `POST` | `/api/transfers/{id}/cancel` | Cancels a `Requested` transfer without modifying stock | `200 OK`, `400 Bad Request`, `404 Not Found`, `409 Conflict` |
+
+
+

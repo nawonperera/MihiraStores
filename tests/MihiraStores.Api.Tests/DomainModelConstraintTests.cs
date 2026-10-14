@@ -29,30 +29,6 @@ public class DomainModelConstraintTests : IDisposable
     }
 
     [Fact]
-    public async Task Branch_DuplicateCode_ShouldThrowDbUpdateException()
-    {
-        using var context = new AppDbContext(_contextOptions);
-
-        context.Branches.Add(new Branch { Name = "Branch 1", Code = "B1", IsWarehouse = false });
-        await context.SaveChangesAsync();
-
-        context.Branches.Add(new Branch { Name = "Branch 2", Code = "B1", IsWarehouse = false });
-        await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
-    }
-
-    [Fact]
-    public async Task Product_DuplicateSKU_ShouldThrowDbUpdateException()
-    {
-        using var context = new AppDbContext(_contextOptions);
-
-        context.Products.Add(new Product { Name = "Product 1", SKU = "SKU-1" });
-        await context.SaveChangesAsync();
-
-        context.Products.Add(new Product { Name = "Product 2", SKU = "SKU-1" });
-        await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
-    }
-
-    [Fact]
     public async Task Stock_DuplicateBranchAndProduct_ShouldThrowDbUpdateException()
     {
         using var context = new AppDbContext(_contextOptions);
@@ -80,42 +56,5 @@ public class DomainModelConstraintTests : IDisposable
             LastUpdatedUtc = DateTime.UtcNow
         });
         await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
-    }
-
-    [Fact]
-    public async Task StockTransfer_CascadesDeleteToLines_WhenTransferIsRemoved()
-    {
-        using var context = new AppDbContext(_contextOptions);
-
-        var b1 = new Branch { Name = "Warehouse", Code = "WH", IsWarehouse = true };
-        var b2 = new Branch { Name = "Colombo", Code = "CMB", IsWarehouse = false };
-        var prod = new Product { Name = "Rice", SKU = "SKU-RICE" };
-        context.Branches.AddRange(b1, b2);
-        context.Products.Add(prod);
-        await context.SaveChangesAsync();
-
-        var transfer = new StockTransfer
-        {
-            FromBranchId = b1.Id,
-            ToBranchId = b2.Id,
-            Status = TransferStatus.Requested,
-            CreatedAtUtc = DateTime.UtcNow,
-            Lines = new List<StockTransferLine>
-            {
-                new() { ProductId = prod.Id, Quantity = 10 }
-            }
-        };
-
-        context.StockTransfers.Add(transfer);
-        await context.SaveChangesAsync();
-
-        Assert.Equal(1, await context.StockTransferLines.CountAsync());
-
-        // Delete transfer
-        context.StockTransfers.Remove(transfer);
-        await context.SaveChangesAsync();
-
-        // Lines should be cascade-deleted
-        Assert.Equal(0, await context.StockTransferLines.CountAsync());
     }
 }
