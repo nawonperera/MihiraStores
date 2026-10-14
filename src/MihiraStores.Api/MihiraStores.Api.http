@@ -1,0 +1,6 @@
+@MihiraStores.Api_HostAddress = http://localhost:5079
+
+GET {{MihiraStores.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
